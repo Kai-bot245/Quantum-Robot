@@ -1,56 +1,47 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Quantum Robot</title>
+  <meta charset="UTF-8">
+  <title>Quantum Robot 0.2</title>
   <style>
-    body { font-family: Arial; }
-    #chat { border: 1px solid #ccc; padding: 10px; width: 360px; height: 300px; overflow-y: auto; }
-    #input { width: 260px; }
-    .bar { margin-top: 10px; }
+    body { font-family: Arial, sans-serif; background:#111; color:#eee; }
+    #chat { max-width:600px; margin:20px auto; padding:10px; background:#222; border-radius:8px; }
+    #messages { height:300px; overflow-y:auto; border:1px solid #444; padding:10px; margin-bottom:10px; }
+    #input { width:80%; padding:8px; }
+    button { padding:8px; margin:4px; }
   </style>
 </head>
 <body>
-  <h2>Quantum Robot 🤖</h2>
-
-  <div id="chat"></div>
-  <div class="bar">
-    <input id="input" type="text" placeholder="Say something..." />
-    <button id="sendBtn">Send</button>
-    <button id="voiceBtn">🎤 Start Voice</button>
+  <div id="chat">
+    <h2>Quantum Robot v0.2</h2>
+    <div id="messages"></div>
+    <input id="input" placeholder="Type here...">
+    <button onclick="sendMessage()">Send</button>
+    <button id="startBtn">🎤 Start Voice</button>
     <button id="stopBtn">🛑 Stop Voice</button>
   </div>
 
   <script>
-    const chat = document.getElementById("chat");
+    const messages = document.getElementById("messages");
     const input = document.getElementById("input");
-    const sendBtn = document.getElementById("sendBtn");
-    const voiceBtn = document.getElementById("voiceBtn");
-    const stopBtn = document.getElementById("stopBtn");
-
-    let recognition;
-    let isListening = false;
-    let lastBotReply = "";
-
-    sendBtn.onclick = send;
-    voiceBtn.onclick = startVoice;
-    stopBtn.onclick = stopVoice;
+    let recognition, isListening = false;
 
     function addMessage(msg) {
       const div = document.createElement("div");
-      div.innerHTML = msg;
-      chat.appendChild(div);
-      chat.scrollTop = chat.scrollHeight;
+      div.textContent = msg;
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
     }
 
-    function send() {
+    async function sendMessage() {
       const text = input.value.trim();
       if (!text) return;
       addMessage("You: " + text);
       input.value = "";
-      respond(text);
+      await respond(text);
     }
 
+    // --- Voice ---
     function startVoice() {
       if (isListening) return;
       if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
@@ -61,19 +52,18 @@
       recognition.lang = "en-US";
       recognition.interimResults = false;
       recognition.continuous = true;
-
-      recognition.onresult = (event) => {
-        let transcript = event.results[event.results.length - 1][0].transcript.trim();
-        addMessage("You (voice): " + transcript);
-        respond(transcript);
-      };
-
-      recognition.onend = () => { if (isListening) recognition.start(); };
-      recognition.onerror = (event) => { addMessage("Bot: Mic error: " + event.error); isListening = false; };
-
       recognition.start();
       isListening = true;
-      addMessage("Bot: Voice mode activated 🎙️ Say something!");
+
+      recognition.onresult = async (event) => {
+        const text = event.results[event.results.length - 1][0].transcript.trim();
+        addMessage("You (voice): " + text);
+        await respond(text);
+      };
+
+      recognition.onerror = (event) => {
+        addMessage("Bot: Mic error: " + event.error);
+      };
     }
 
     function stopVoice() {
@@ -83,21 +73,21 @@
     }
 
     function speak(text) {
-      if (recognition && isListening) {
-        recognition.stop();
-        isListening = false;
-      }
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = "en-US";
-      utterance.onend = () => {
-        lastBotReply = text;
-        if (recognition && !isListening) {
-          setTimeout(() => { recognition.start(); isListening = true; }, 1000);
-        }
-      };
-      speechSynthesis.speak(utterance);
+  if (typeof recognition !== "undefined" && recognition) {
+    recognition.stop(); // stop listening only if recognition is active
+  }
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.onend = () => {
+    if (typeof recognition !== "undefined" && recognition) {
+      recognition.start(); // resume listening
     }
+  };
+  speechSynthesis.speak(utterance);
+}
 
+
+    document.getElementById("startBtn").onclick = startVoice;
+    document.getElementById("stopBtn").onclick = stopVoice;
     // --- Timers ---
     let activeTimers = [];
     function setTimer(durationSec) {
@@ -143,7 +133,7 @@
       const lower = text.toLowerCase();
       let reply = null;
 
-      // Timers by duration
+      // Timers
       const timerMatch = lower.match(/set (a )?timer (for )?(one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s*(seconds?|sec|minutes?|mins?)/);
       if (timerMatch) {
         let value = timerMatch[3];
@@ -154,7 +144,7 @@
         reply = setTimer(value);
       }
 
-      // Alarms by clock time
+      // Alarms
       const timerUntilMatch = lower.match(/set (a )?timer (till|until|for) (\d{1,2}):(\d{2})(\s?(am|pm))?/);
       if (!reply && timerUntilMatch) {
         let hour = parseInt(timerUntilMatch[3]);
@@ -178,21 +168,20 @@
 
       // Joke
       if (!reply && /joke/.test(lower)) {
-  try {
-    const res = await fetch("https://official-joke-api.appspot.com/random_joke");
-    const data = await res.json();
-    reply = `${data.setup} ${data.punchline}`;
-  } catch {
-    reply = "Sorry, I couldn’t fetch a new joke right now.";
-  }
-}
-
+        try {
+          const res = await fetch("https://official-joke-api.appspot.com/random_joke");
+          const data = await res.json();
+          reply = `${data.setup} ${data.punchline}`;
+        } catch {
+          reply = "Sorry, I couldn’t fetch a new joke right now.";
+        }
+      }
 
       // Name
       if (!reply && /what'?s your name/.test(lower)) reply = "I'm Quantum Robot 🤖 — your friendly AI companion!";
 
       // Creator
-      if (!reply && /who made you/.test(lower)) reply = "I was created by Kai Brotzman — the creater that made Quantum Robot!";
+      if (!reply && /who made you/.test(lower)) reply = "I was created by Kai Brotzman — the creator that made Quantum Robot!";
 
       // Time/Date
       if (!reply && /(what'?s )?(the )?(time|date)/.test(lower)) {
@@ -202,7 +191,7 @@
 
       // Weather
       if (!reply && /weather/.test(lower)) reply = await getWeatherReply();
-      // Holiday countdowns
+      // Holidays
       const holidayMatch = lower.match(/how many days until (christmas|thanksgiving|new year|halloween)/);
       if (!reply && holidayMatch) {
         const holiday = holidayMatch[1];
@@ -212,7 +201,7 @@
         else if (holiday === "new year") target = new Date(now.getFullYear() + 1, 0, 1);
         else if (holiday === "halloween") target = new Date(now.getFullYear(), 9, 31);
         else if (holiday === "thanksgiving") {
-          target = new Date(now.getFullYear(), 10, 1); // Nov 1
+          target = new Date(now.getFullYear(), 10, 1);
           let thursdayCount = 0;
           while (true) {
             if (target.getDay() === 4) thursdayCount++;
@@ -240,10 +229,9 @@
         }
       }
 
-      // Wikipedia fallback
-      if (!reply && !/weather/.test(lower) &&
-          /^(who|what|when|where|why|how|is|are|can|does|do|did|should|could|would)\b/.test(lower)) {
-        reply = await fetchWikipediaOrWebSummary(text);
+      // Google-only fallback for open-ended questions
+      if (!reply && /^(who|what|when|where|why|how|is|are|can|does|do|did|should|could|would)\b/.test(lower)) {
+        reply = await fetchGoogleSummary(text);
       }
 
       if (reply) {
@@ -258,30 +246,29 @@
     // --- Weather helper ---
     function cToF(celsius) { return (celsius * 9/5) + 32; }
     async function getWeatherReply() {
-  if (!navigator.geolocation) return "I couldn't access your location.";
-  return new Promise((resolve) => {
-    navigator.geolocation.getCurrentPosition(async (pos) => {
-      const { latitude, longitude } = pos.coords;
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code,wind_speed_10m&timezone=auto`;
-      try {
-        const res = await fetch(url);
-        const data = await res.json();
-        const t = data?.current?.temperature_2m;
-        const w = data?.current?.wind_speed_10m;
-        const code = data?.current?.weather_code;
-        const desc = weatherCodeToDesc(code);
-        if (typeof t === "number") {
-          resolve(`🌤️ Weather now: ${desc}. Temperature is ${Math.round(cToF(t))}°F with wind speed ${Math.round(w)} meters per second.`);
-        } else {
-          resolve("I couldn't read the weather right now.");
-        }
-      } catch {
-        resolve("Weather service isn't reachable.");
-      }
-    }, () => resolve("Location permission denied."));
-  });
-}
-
+      if (!navigator.geolocation) return "I couldn't access your location.";
+      return new Promise((resolve) => {
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+          const { latitude, longitude } = pos.coords;
+          const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code,wind_speed_10m&timezone=auto`;
+          try {
+            const res = await fetch(url);
+            const data = await res.json();
+            const t = data?.current?.temperature_2m;
+            const w = data?.current?.wind_speed_10m;
+            const code = data?.current?.weather_code;
+            const desc = weatherCodeToDesc(code);
+            if (typeof t === "number") {
+              resolve(`🌤️ Weather now: ${desc}. Temperature is ${Math.round(cToF(t))}°F with wind speed ${Math.round(w)} meters per second.`);
+            } else {
+              resolve("I couldn't read the weather right now.");
+            }
+          } catch {
+            resolve("Weather service isn't reachable.");
+          }
+        }, () => resolve("Location permission denied."));
+      });
+    }
 
     function weatherCodeToDesc(code) {
       const map = {
@@ -295,31 +282,31 @@
       return map[code] || "Unknown weather";
     }
 
-    // --- Wikipedia fallback ---
-    async function fetchWikipediaOrWebSummary(query) {
-      const search = encodeURIComponent(query.trim());
-      const wikiSearchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${search}&format=json&origin=*`;
+// --- Google-only summary (Wikipedia only, clean sentences) ---
+async function fetchGoogleSummary(query) {
+  const searchUrl = `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(query)}+site:wikipedia.org&key=AIzaSyDO7f5IWAUprCU6kiauSIuXnIbwsLb7cd4&cx=24a07442e98f24a01`;
+  try {
+    const res = await fetch(searchUrl);
+    const data = await res.json();
+    if (data.items && data.items.length > 0) {
+      const item = data.items.find(i => /wikipedia\.org/.test(i.link));
+      if (!item) return "No Wikipedia result found.";
 
-      try {
-        const searchRes = await fetch(wikiSearchUrl);
-        const searchData = await searchRes.json();
-        const firstResult = searchData.query.search[0];
-        if (!firstResult) throw new Error("No Wikipedia results");
-
-        const title = encodeURIComponent(firstResult.title);
-        const summaryUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${title}`;
-        const summaryRes = await fetch(summaryUrl);
-        const summaryData = await summaryRes.json();
-
-        if (summaryData.extract) {
-          return `${summaryData.title}: ${summaryData.extract}`;
-        } else {
-          throw new Error("No summary");
-        }
-      } catch {
-        return `I couldn't find a direct summary, but you can search online for more info.`;
+      // Clean snippet: strip trailing "..." and cut back to last full sentence
+      let snippet = item.snippet.replace(/\.\.\.$/, "").trim();
+      const lastPeriod = snippet.lastIndexOf(".");
+      if (lastPeriod > 0) {
+        snippet = snippet.slice(0, lastPeriod + 1);
       }
+
+      return `${item.title}: ${snippet}`;
+    } else {
+      return "No Wikipedia result found.";
     }
-  </script>
+  } catch {
+    return "Wikipedia search failed.";
+  }
+}
+ </script>
 </body>
 </html>
