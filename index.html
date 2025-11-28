@@ -282,9 +282,9 @@
       return map[code] || "Unknown weather";
     }
 
-// --- Google-only summary (Wikipedia only, clean sentences) ---
+// --- Google-only summary (Wikipedia only, clean sentences, no title prefix) ---
 async function fetchGoogleSummary(query) {
-  const searchUrl = `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(query)}+site:wikipedia.org&key=AIzaSyDO7f5IWAUprCU6kiauSIuXnIbwsLb7cd4&cx=24a07442e98f24a01`;
+  const searchUrl = `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(query)}+site:wikipedia.org&key=YOUR_API_KEY&cx=YOUR_CX_ID`;
   try {
     const res = await fetch(searchUrl);
     const data = await res.json();
@@ -299,7 +299,8 @@ async function fetchGoogleSummary(query) {
         snippet = snippet.slice(0, lastPeriod + 1);
       }
 
-      return `${item.title}: ${snippet}`;
+      // ✅ Return only the snippet, no title prefix
+      return snippet;
     } else {
       return "No Wikipedia result found.";
     }
